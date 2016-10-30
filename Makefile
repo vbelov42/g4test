@@ -14,16 +14,19 @@ endif
 ifneq ($(G4CONFIG),)
   # This is available since 9.5 with cmake build system
   # Take everything from config provided
-  G4ENV = $(G4BASE)/bin/geant4.sh
-  G4INC := $(filter -D% -I% -W%, $(shell $(G4CONFIG) --cflags))
-  G4LIBS := $(shell $(G4CONFIG) --libs)
+  G4BASE := $(shell cd `$(G4CONFIG) --prefix`; pwd)
+  G4ENV := $(subst /geant4-config,/geant4.sh,$(G4CONFIG))
+  G4INC := $(filter -D% -I% -W%, $(shell $(G4CONFIG) --cflags-without-gui))
+  G4LIBS := $(shell $(G4CONFIG) --libs-without-gui)
 else ifneq ($(G4ENV),)
   # This is an old shell-based build system
   # Guess from config environment provided
+  G4BASE := $(G4INSTALL)
   G4INC := $(shell source $(G4ENV) >/dev/null; echo -I$$G4INCLUDE -I$$CLHEP_INCLUDE_DIR)
   G4LIBS := $(shell source $(G4ENV) >/dev/null; echo -L$$G4LIB/$$G4SYSTEM; cd $$G4LIB/$$G4SYSTEM; ls -1 libG4*.so | sed 's/^lib/-l/; s/\.so//;'; echo -L$$CLHEP_LIB_DIR -l$$CLHEP_LIB)
 else ifneq ($(G4SYSTEM),)
   # Looks like shell variables are set, use it
+  G4BASE = $(G4INSTALL)
   G4INC := $(shell echo -I$$G4INCLUDE -I$$CLHEP_INCLUDE_DIR)
   G4LIBS := $(shell echo -L$$G4LIB/$$G4SYSTEM; cd $$G4LIB/$$G4SYSTEM; ls -1 libG4*.so | sed 's/^lib/-l/; s/\.so//;'; echo -L$$CLHEP_LIB_DIR -l$$CLHEP_LIB)
 else
@@ -36,16 +39,20 @@ CXXFLAGS += $(G4INC) -ggdb -fPIC
 LDFLAGS += -ggdb
 LDLIBS += $(G4LIBS)
 
-.PHONY: all
+.PHONY: all g4base
 all: g4test
 
-ifneq ($(MAKECMDGOALS),clean)
+ifeq ($(filter $(MAKECMDGOALS),clean g4base),)
 -include depend
 endif
 
 OBJECTS = \
     DetectorConstruction.o PrimaryGeneratorAction.o PhysicsList.o \
     g4test.o
+
+g4base:
+	@echo $(G4BASE)
+# remember situations like /usr/lib64/alsa-lib/
 
 g4test: $(OBJECTS)
 	$(CXX) $(LDFLAGS) -o $@ $^ $(LDLIBS)
